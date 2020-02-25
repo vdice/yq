@@ -77,7 +77,22 @@ func appendDocument(originalMatchingNodes []*yqlib.NodeContext, dataBucket yaml.
 	return append(originalMatchingNodes, matchingNodes...), nil
 }
 
-func printValue(node *yaml.Node, writer io.Writer) error {
+func lengthOf(node *yaml.Node) int {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		return len(node.Value)
+	case yaml.MappingNode:
+		return len(node.Content) / 2
+	default:
+		return len(node.Content)
+	}
+}
+
+func printValue(node *yaml.Node, writer io.Writer, shouldPrintLength bool) error {
+	if shouldPrintLength {
+		return writeString(writer, fmt.Sprintf("%v\n", lengthOf(node)))
+	}
+
 	if node.Kind == yaml.ScalarNode {
 		_, errorWriting := writer.Write([]byte(node.Value + "\n"))
 		return errorWriting
@@ -159,6 +174,9 @@ func printResults(matchingNodes []*yqlib.NodeContext, writer io.Writer) error {
 		}
 		return nil
 	}
+
+	var arrayNode = yaml.Node{Kind: yaml.SequenceNode}
+
 	var errorWriting error
 	for _, mappedDoc := range matchingNodes {
 		switch printMode {
@@ -172,14 +190,28 @@ func printResults(matchingNodes []*yqlib.NodeContext, writer io.Writer) error {
 			var parentNode = yaml.Node{Kind: yaml.MappingNode}
 			parentNode.Content = make([]*yaml.Node, 2)
 			parentNode.Content[0] = &yaml.Node{Kind: yaml.ScalarNode, Value: lib.PathStackToString(mappedDoc.PathStack)}
-			parentNode.Content[1] = mappedDoc.Node
-			if err := printValue(&parentNode, bufferedWriter); err != nil {
+			if printLength {
+				parentNode.Content[1] = &yaml.Node{Kind: yaml.ScalarNode, Value: fmt.Sprintf("%v", lengthOf(mappedDoc.Node))}
+			} else {
+				parentNode.Content[1] = mappedDoc.Node
+			}
+			if resultsAsArray {
+				arrayNode.Content = append(arrayNode.Content, &parentNode)
+			} else if err := printValue(&parentNode, bufferedWriter, false); err != nil {
 				return err
 			}
 		default:
-			if err := printValue(mappedDoc.Node, bufferedWriter); err != nil {
+			if resultsAsArray || printLength {
+				arrayNode.Content = append(arrayNode.Content, mappedDoc.Node)
+			} else if err := printValue(mappedDoc.Node, bufferedWriter, false); err != nil {
 				return err
 			}
+		}
+	}
+
+	if resultsAsArray || (printMode == "v" && printLength) {
+		if err := printValue(&arrayNode, bufferedWriter, printLength); err != nil {
+			return err
 		}
 	}
 
