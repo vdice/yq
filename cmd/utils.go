@@ -78,7 +78,12 @@ func appendDocument(originalMatchingNodes []*yqlib.NodeContext, dataBucket yaml.
 }
 
 func lengthOf(node *yaml.Node) int {
-	switch node.Kind {
+	kindToCheck := node.Kind
+	if node.Kind == yaml.DocumentNode && len(node.Content) == 1 {
+		log.Debugf("length of document node, calculating length of child")
+		kindToCheck = node.Content[0].Kind
+	}
+	switch kindToCheck {
 	case yaml.ScalarNode:
 		return len(node.Value)
 	case yaml.MappingNode:
@@ -175,7 +180,7 @@ func printResults(matchingNodes []*yqlib.NodeContext, writer io.Writer) error {
 		return nil
 	}
 
-	var arrayNode = yaml.Node{Kind: yaml.SequenceNode}
+	var counter = 0
 
 	var errorWriting error
 	for _, mappedDoc := range matchingNodes {
@@ -195,22 +200,20 @@ func printResults(matchingNodes []*yqlib.NodeContext, writer io.Writer) error {
 			} else {
 				parentNode.Content[1] = mappedDoc.Node
 			}
-			if resultsAsArray {
-				arrayNode.Content = append(arrayNode.Content, &parentNode)
-			} else if err := printValue(&parentNode, bufferedWriter, false); err != nil {
+			if err := printValue(&parentNode, bufferedWriter, false); err != nil {
 				return err
 			}
 		default:
-			if resultsAsArray || printLength {
-				arrayNode.Content = append(arrayNode.Content, mappedDoc.Node)
+			if printLength {
+				counter = counter + lengthOf(mappedDoc.Node)
 			} else if err := printValue(mappedDoc.Node, bufferedWriter, false); err != nil {
 				return err
 			}
 		}
 	}
 
-	if resultsAsArray || (printMode == "v" && printLength) {
-		if err := printValue(&arrayNode, bufferedWriter, printLength); err != nil {
+	if printLength {
+		if err := writeString(bufferedWriter, fmt.Sprintf("%v\n", counter)); err != nil {
 			return err
 		}
 	}
