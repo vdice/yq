@@ -401,7 +401,7 @@ func prefixDocument(updateAll bool, docIndexInt int, currentIndex int, dataBucke
 	return nil
 }
 
-func updateDoc(inputFile string, updateCommands []yqlib.UpdateCommand, writer io.Writer) error {
+func UpdateDoc(inputFile string, updateCommands []yqlib.UpdateCommand, writer io.Writer) error {
 	var updateAll, docIndexInt, errorParsingDocIndex = parseDocumentIndex()
 	if errorParsingDocIndex != nil {
 		return errorParsingDocIndex

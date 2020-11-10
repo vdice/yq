@@ -57,5 +57,5 @@ func writeProperty(cmd *cobra.Command, args []string) error {
 	if updateCommandsError != nil {
 		return updateCommandsError
 	}
-	return updateDoc(args[0], updateCommands, cmd.OutOrStdout())
+	return UpdateDoc(args[0], updateCommands, cmd.OutOrStdout())
 }
